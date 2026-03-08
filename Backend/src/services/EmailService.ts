@@ -66,11 +66,11 @@ export default class EmailService {
           Questions? Contact us at <strong>greengaurdian@vaishnavikadam.me</strong>
         </p>
         
-        <p style="color: #2d5016; font-weight: bold;">The GreenGuardian Team</p>
+        <p style="color: #2d5016; font-weight: bold;">The GreenGuardian Team🌿</p>
       </div>
     `;
     
-    await this.sendEmail(to, "Verify Your Email - GreenGuardian", htmlContent);
+    await this.sendEmail(to, "Verify Your Email - GreenGuardian🌿", htmlContent);
   }
 
   async sendSignupConfirmationEmail(to: string, username: string): Promise<void> {
@@ -90,11 +90,11 @@ export default class EmailService {
           If you have any questions, feel free to reach out to us at greengaurdian@vaishnavikadam.me
         </p>
         <p style="color: #2d5016;">Happy gardening!</p>
-        <p><strong>The GreenGuardian Team</strong></p>
+        <p><strong>The GreenGuardian Team🌿</strong></p>
       </div>
     `;
     
-    await this.sendEmail(to, "Welcome to GreenGuardian", htmlContent);
+    await this.sendEmail(to, "Welcome to GreenGuardian🌿", htmlContent);
   }
 
   // Generate a verification token
