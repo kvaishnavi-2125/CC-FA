@@ -15,7 +15,7 @@ class SupabaseService {
   }
 
   static async signup(email: string, password: string, metadata: { [key: string]: any }) {
-    // Get frontend URL for redirect (not actually used for verification, just to suppress Supabase email)
+    // Get frontend URL for redirect
     const frontendUrl = import.meta.env.VITE_FRONTEND_URL || window.location.origin;
     
     const { data, error } = await supabase.auth.signUp(
@@ -24,7 +24,7 @@ class SupabaseService {
         password,
         options: {
           data: metadata,
-          emailRedirectTo: `${frontendUrl}/auth/verify`, // This helps suppress Supabase confirmation email
+          emailRedirectTo: `${frontendUrl}/auth/verify`,
         }
       }
     );

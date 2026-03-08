@@ -25,24 +25,24 @@ const VerifyEmailPage = () => {
       try {
         const backendUrl = import.meta.env.VITE_APP_BACKEND_BASE_URL;
         
-        const response = await axios.post(`${backendUrl}/verify-email`, {
+        await axios.post(`${backendUrl}/verify-email`, {
           token,
           email,
         });
 
         setStatus("success");
         setMessage("Email verified successfully! 🎉");
-        toast.success("Email verified! You can now continue using GreenGuardian.");
+        toast.success("✅ Email verified! Redirecting to home...");
         
-        // Redirect to home after 3 seconds
+        // Redirect to home after 2 seconds
         setTimeout(() => {
-          navigate("/");
-        }, 3000);
+          navigate("/home");
+        }, 2000);
       } catch (error: any) {
         setStatus("error");
         const errorMessage = error.response?.data?.error || "Verification failed. Please try again.";
         setMessage(errorMessage);
-        toast.error(errorMessage);
+        toast.error("❌ " + errorMessage);
       }
     };
 
