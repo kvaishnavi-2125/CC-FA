@@ -112,7 +112,7 @@ const RegisterPage = () => {
             JSON.stringify({ email: formData.email, password: formData.password })
           );
 
-          toast.success("Registration successful. Verification email sent. Check your inbox.", {
+          toast.success("Verification email sent. Check your inbox to verify your email", {
             duration: 5000,
           });
           // Reset form

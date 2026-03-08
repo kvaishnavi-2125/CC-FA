@@ -8,9 +8,28 @@ const APP_BACKEND_BASE_URL = import.meta.env.VITE_APP_BACKEND_BASE_URL;
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 class SupabaseService {
+  private static async isRegisteredUser(uid: string): Promise<boolean> {
+    const response = await axios.get(`${APP_BACKEND_BASE_URL}/user`, {
+      params: { uid },
+    });
+
+    return Boolean(response.data);
+  }
+
   static async login(email: string, password: string) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+
+    if (!data.user?.id) {
+      throw new Error("Login failed. Please try again.");
+    }
+
+    const isRegistered = await this.isRegisteredUser(data.user.id);
+    if (!isRegistered) {
+      await supabase.auth.signOut();
+      throw new Error("User not registered. Please register first.");
+    }
+
     return data;
   }
 
@@ -57,6 +76,29 @@ class SupabaseService {
       console.error("Error fetching session:", error);
       return null;
     }
+
+    if (!data.session) {
+      return null;
+    }
+
+    const uid = data.session.user?.id;
+    if (!uid) {
+      await supabase.auth.signOut();
+      return null;
+    }
+
+    try {
+      const isRegistered = await this.isRegisteredUser(uid);
+      if (!isRegistered) {
+        await supabase.auth.signOut();
+        return null;
+      }
+    } catch (sessionValidationError) {
+      console.error("Session validation error:", sessionValidationError);
+      await supabase.auth.signOut();
+      return null;
+    }
+
     return data.session;
   }
 
