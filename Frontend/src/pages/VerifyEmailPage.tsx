@@ -37,13 +37,13 @@ const VerifyEmailPage = () => {
         setMessage("Email verified successfully.");
         toast.success("Email verified successfully.");
 
-        // Standard flow: user must verify first. After verify, auto-login from this browser session if possible.
-        const pending = sessionStorage.getItem("pendingSignupCredentials");
+        // Standard flow: user must verify first. After verify, auto-login if pending credentials exist.
+        const pending = localStorage.getItem("pendingSignupCredentials");
         if (pending) {
           const { email, password } = JSON.parse(pending) as { email: string; password: string };
           if (email === emailParam) {
             const success = await login(email, password);
-            sessionStorage.removeItem("pendingSignupCredentials");
+            localStorage.removeItem("pendingSignupCredentials");
             if (success) {
               toast.success("Verification completed. Redirecting to home.");
               setTimeout(() => navigate("/home"), 900);
@@ -52,8 +52,8 @@ const VerifyEmailPage = () => {
           }
         }
 
-        toast.success("Verification completed. Please log in.");
-        setTimeout(() => navigate("/login"), 900);
+        // Do not auto-send user to login. Keep this page with clear state.
+        setMessage("Email verified. Please continue from this browser session.");
       } catch (error: any) {
         setStatus("error");
         const errorMessage = error.response?.data?.error || "Verification failed. Please try again.";

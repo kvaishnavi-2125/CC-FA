@@ -106,8 +106,8 @@ const RegisterPage = () => {
 
         const success = await signup(formData.email, formData.password, metadata);
         if (success) {
-          // Store pending credentials only for immediate post-verification auto login.
-          sessionStorage.setItem(
+          // Store pending credentials for post-verification auto login.
+          localStorage.setItem(
             "pendingSignupCredentials",
             JSON.stringify({ email: formData.email, password: formData.password })
           );
@@ -126,11 +126,11 @@ const RegisterPage = () => {
           });
           // User is logged out - they must verify email first
         } else {
-          sessionStorage.removeItem("pendingSignupCredentials");
+          localStorage.removeItem("pendingSignupCredentials");
           toast.error("Registration failed. Please try again.");
         }
       } catch (error) {
-        sessionStorage.removeItem("pendingSignupCredentials");
+        localStorage.removeItem("pendingSignupCredentials");
         toast.error("An error occurred during registration.");
         console.error("Registration error:", error);
       } finally {
