@@ -109,8 +109,16 @@ const RegisterPage = () => {
           toast.success("✉️ Registration successful! Verification email sent. Check your inbox.", {
             duration: 5000,
           });
-          // They're logged in but unconfirmed - they'll be verified once they click the email link
-          // Stay on page so they see the message
+          // Reset form
+          setFormData({
+            name: "",
+            mobile: "",
+            address: "",
+            email: "",
+            password: "",
+            confirmPassword: "",
+          });
+          // User is logged out - they must verify email first
         } else {
           toast.error("Registration failed on GreenGuardian. Please try again.");
         }

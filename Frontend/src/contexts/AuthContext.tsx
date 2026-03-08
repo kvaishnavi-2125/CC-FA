@@ -40,10 +40,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signup = async (email: string, password: string, metadata: { [key: string]: any }): Promise<boolean> => {
     try {
-      const data = await SupabaseService.signup(email, password, metadata);
-      // Keep user logged in - they'll be unconfirmed until email verification
-      setUser(data.user);
-      setIsAuthenticated(true);
+      await SupabaseService.signup(email, password, metadata);
+      // User is signed out after signup - they must verify email first
+      setUser(null);
+      setIsAuthenticated(false);
       return true;
     } catch (error) {
       console.error("Signup error:", error);

@@ -24,7 +24,7 @@ class SupabaseService {
         password,
         options: {
           data: metadata,
-          emailRedirectTo: `${frontendUrl}/auth/verify`,
+          emailRedirectTo: `${frontendUrl}/verify-email`,
         }
       }
     );
@@ -44,6 +44,9 @@ class SupabaseService {
       console.error("Error creating user in database:", postError);
       throw postError;
     }
+
+    // Sign out immediately - user must verify email first
+    await supabase.auth.signOut();
 
     return data;
   }
