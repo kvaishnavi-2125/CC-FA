@@ -50,13 +50,25 @@ class PlantService {
       .from("plants")
       .select("*")
       .eq("plant_id", plant_id)
-      .single();
+      .limit(1)
+      .maybeSingle();
 
-    if (error) {
-      throw error;
+    if (!error && data) {
+      return data;
     }
 
-    return data;
+    const { data: fallbackData, error: fallbackError } = await this.client
+      .from("plants")
+      .select("*")
+      .eq("id", plant_id)
+      .limit(1)
+      .maybeSingle();
+
+    if (fallbackError) {
+      throw fallbackError;
+    }
+
+    return fallbackData;
   }
 
   async createPlant(plantData: Plant, imageFile?: File | Blob) {
@@ -70,15 +82,38 @@ class PlantService {
       imageUrl = data.publicUrl;
     }
 
-    const { error } = await this.client
-      .from("plants")
-      .insert([{ ...plantData, image_url: imageUrl }]);
+    const insertPayload: Record<string, any> = {
+      ...plantData,
+      image_url: imageUrl,
+      // Compatibility if DB uses `name` instead of `plant_name`.
+      name: plantData.plant_name,
+    };
 
-    if (error) {
+    let attempts = 0;
+    while (attempts < 8) {
+      const { data, error } = await this.client
+        .from("plants")
+        .insert([insertPayload])
+        .select()
+        .single();
+
+      if (!error) {
+        return data;
+      }
+
+      const message = String(error?.message || "");
+      const missingColumnMatch = message.match(/Could not find the '([^']+)' column/);
+
+      if (missingColumnMatch?.[1]) {
+        delete insertPayload[missingColumnMatch[1]];
+        attempts += 1;
+        continue;
+      }
+
       throw error;
     }
 
-    return true;
+    throw new Error("Failed to insert plant due to schema mismatch");
   }
 
   async updateCareRecommendations(plantId: string, careRecommendations: string) {

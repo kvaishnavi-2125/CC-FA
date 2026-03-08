@@ -28,7 +28,7 @@ app.use(cors({
 
 // Health check
 app.get("/", (req: Request, res: Response) => {
-  res.json({ message: "Fern Helper Backend is running!" });
+  res.json({ message: "GreenGuardian Backend is running!" });
 });
 
 // ===== USER ENDPOINTS =====
@@ -224,13 +224,29 @@ app.post("/plants", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Missing plant data" });
     }
 
-    // Generate care recommendations
-    const geminiService = new GeminiService();
-    const careRecommendations = await geminiService.getCareRecommendations(
-      plantData,
-      undefined  // No file upload for now, images come as base64 in body
-    );
-    plantData.care_recommendations = careRecommendations;
+    if (!plantData.image_url) {
+      plantData.image_url = "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=800&auto=format&fit=crop";
+    }
+
+    let careRecommendations: any = {
+      recommendation: "Keep the soil lightly moist, provide indirect light, and monitor leaf health weekly.",
+      fertilizers: ["Balanced NPK fertilizer"],
+      precautions: ["Avoid overwatering", "Ensure proper drainage"],
+      water_frequency: 7,
+    };
+
+    // Try to generate AI recommendations, but don't block plant creation if it fails.
+    try {
+      const geminiService = new GeminiService();
+      careRecommendations = await geminiService.getCareRecommendations(
+        plantData,
+        undefined
+      );
+    } catch (aiError) {
+      console.error("AI recommendation generation failed, using defaults:", aiError);
+    }
+
+    plantData.care_recommendations = JSON.stringify(careRecommendations);
 
     // Create plant
     const plantService = new PlantService();
@@ -239,6 +255,8 @@ app.post("/plants", async (req: Request, res: Response) => {
     if (!newPlant) {
       return res.status(500).json({ error: "Failed to create plant" });
     }
+
+    let emailSent = false;
 
     // Send email with recommendations
     try {
@@ -250,23 +268,24 @@ app.post("/plants", async (req: Request, res: Response) => {
         const emailContent = `
           <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             <header style="background-color: #4CAF50; color: white; padding: 10px; text-align: center;">
-              <h1>Fern Helper</h1>
+              <h1>GreenGuardian </h1>
             </header>
             <main style="padding: 20px;">
               <h2>Plant Care Recommendations</h2>
               <p><strong>Plant Name:</strong> ${plantData.plant_name}</p>
               <p><strong>Nickname:</strong> ${plantData.nickname || "N/A"}</p>
-              <p><strong>Care Recommendations:</strong> ${careRecommendations.recommendation}</p>
-              <p><strong>Fertilizers:</strong> ${careRecommendations.fertilizers.join(", ")}</p>
-              <p><strong>Precautions:</strong> ${careRecommendations.precautions.join(", ")}</p>
-              <p><strong>Water Frequency:</strong> Every ${careRecommendations.water_frequency} days</p>
+              <p><strong>Care Recommendations:</strong> ${careRecommendations?.recommendation || "N/A"}</p>
+              <p><strong>Fertilizers:</strong> ${(careRecommendations?.fertilizers || []).join(", ")}</p>
+              <p><strong>Precautions:</strong> ${(careRecommendations?.precautions || []).join(", ")}</p>
+              <p><strong>Water Frequency:</strong> Every ${careRecommendations?.water_frequency || "N/A"} days</p>
             </main>
             <footer style="background-color: #f1f1f1; color: #555; text-align: center; padding: 10px; margin-top: 20px;">
-              <p>Thank you for using Fern Helper!</p>
+              <p>Thank you for using GreenGuardian!</p>
             </footer>
           </div>
         `;
         await emailService.sendEmail(user.email, "Your Plant Care Recommendations", emailContent);
+        emailSent = true;
       }
     } catch (emailError) {
       console.error("Error sending email:", emailError);
@@ -276,6 +295,7 @@ app.post("/plants", async (req: Request, res: Response) => {
     return res.status(201).json({
       message: "Plant created successfully",
       plant: newPlant,
+      emailSent,
     });
   } catch (error: any) {
     console.error("Error creating plant:", error);
@@ -303,7 +323,7 @@ app.post("/chat", async (req: Request, res: Response) => {
 
     const geminiService = new GeminiService();
     const systemPrompt = `
-      You are a smart plant care assistant developed by Fern Helper team.
+      You are a smart plant care assistant developed by GreenGuardian team.
       Your task is to answer questions strictly related to plants, their care, and related topics.
       If the question is unrelated to plants, politely redirect the user to ask plant-related questions.
       Keep responses concise and practical.
