@@ -33,7 +33,8 @@ class UserService {
         .from("users")
         .select("*")
         .eq("user_id", uid)
-        .single();
+        .limit(1)
+        .maybeSingle();
 
       if (error) {
         throw new Error(error.message);
