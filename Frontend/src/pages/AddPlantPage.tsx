@@ -5,6 +5,7 @@ import PageTransition from "@/components/PageTransition";
 import SideNav from "@/components/SideNav";
 import { addPlant } from "@/services/PlantService";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 const AddPlantPage = () => {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ const AddPlantPage = () => {
     plant_type: "Indoor",
     species: "Test Species",
     image: null as File | null,
+    image_url: "",
     location_in_home: "Living Room",
     pot_size: "Medium",
     acquisition_date: "2023-01-01",
@@ -33,21 +35,46 @@ const AddPlantPage = () => {
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setFormData({ ...formData, image: e.target.files[0] });
+      const selectedFile = e.target.files[0];
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData((prev) => ({
+          ...prev,
+          image: selectedFile,
+          image_url: typeof reader.result === "string" ? reader.result : "",
+        }));
+      };
+      reader.readAsDataURL(selectedFile);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      if (!user?.id) {
+        throw new Error("You must be logged in to add a plant");
+      }
+
       const response = await addPlant({
         ...formData,
         user_id: user.id,
+        image: formData.image,
       });
       console.log("Plant Added:", response);
+
+      if (response?.imageUploaded) {
+        toast.success("Image successfully uploaded");
+      }
+
+      if (response?.emailSent) {
+        toast.success("Email sent for plant care recommendation");
+      }
+
+      toast.success("Plant added successfully");
       navigate("/my-plants");
     } catch (error) {
       console.error("Failed to add plant:", error);
+      toast.error("Failed to add plant");
     }
   };
 

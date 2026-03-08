@@ -72,7 +72,7 @@ const categories = [
       },
       {
         id: "op2",
-        name: "Lavender",
+        name: "Sunflower",
         image:
           "https://images.unsplash.com/photo-1455659817273-f96807779a8a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80",
         watering: "Low - Drought tolerant once established",

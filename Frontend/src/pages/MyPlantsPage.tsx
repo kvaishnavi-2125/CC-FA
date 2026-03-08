@@ -76,19 +76,19 @@ const MyPlantsPage = () => {
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
                 {myPlants.map((plant) => (
                   <div
-                    key={plant.plant_id}
-                    onClick={() => handlePlantClick(plant.plant_id)}
+                    key={plant.plant_id || plant.id}
+                    onClick={() => handlePlantClick(plant.plant_id || plant.id)}
                     className="cursor-pointer bg-white rounded-xl shadow-md hover:shadow-lg transition p-4"
                   >
                     <div className="aspect-square overflow-hidden rounded-lg mb-4">
                       <img
-                        src={plant.image_url}
-                        alt={plant.plant_name}
+                        src={plant.image_url || "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=800&auto=format&fit=crop"}
+                        alt={plant.plant_name || plant.name || "Plant"}
                         className="w-full h-full object-cover"
                       />
                     </div>
                     <h3 className="text-lg font-semibold text-center text-plantcare-green">
-                      {plant.plant_name}
+                      {plant.plant_name || plant.name || "Plant"}
                     </h3>
                     <p className="text-sm text-center text-gray-500 mb-4">
                       {plant.nickname || "No nickname"}
