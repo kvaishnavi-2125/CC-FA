@@ -106,7 +106,13 @@ const RegisterPage = () => {
 
         const success = await signup(formData.email, formData.password, metadata);
         if (success) {
-          toast.success("✉️ Registration successful! Verification email sent. Check your inbox.", {
+          // Store pending credentials only for immediate post-verification auto login.
+          sessionStorage.setItem(
+            "pendingSignupCredentials",
+            JSON.stringify({ email: formData.email, password: formData.password })
+          );
+
+          toast.success("Registration successful. Verification email sent. Check your inbox.", {
             duration: 5000,
           });
           // Reset form
@@ -120,10 +126,12 @@ const RegisterPage = () => {
           });
           // User is logged out - they must verify email first
         } else {
-          toast.error("Registration failed on GreenGuardian. Please try again.");
+          sessionStorage.removeItem("pendingSignupCredentials");
+          toast.error("Registration failed. Please try again.");
         }
       } catch (error) {
-        toast.error("An error occurred during registration on GreenGuardian");
+        sessionStorage.removeItem("pendingSignupCredentials");
+        toast.error("An error occurred during registration.");
         console.error("Registration error:", error);
       } finally {
         setIsLoading(false);

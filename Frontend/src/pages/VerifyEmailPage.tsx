@@ -1,21 +1,18 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle, AlertCircle, Loader, Eye, EyeOff } from "lucide-react";
+import { CheckCircle, AlertCircle, Loader } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 import { useAuth } from "@/contexts/AuthContext";
+import PageTransition from "@/components/PageTransition";
 
 const VerifyEmailPage = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const [searchParams] = useSearchParams();
-  const [status, setStatus] = useState<"loading" | "verified" | "login" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "verified" | "error">("loading");
   const [message, setMessage] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const email = searchParams.get("email");
 
   useEffect(() => {
     const verifyEmail = async () => {
@@ -37,124 +34,75 @@ const VerifyEmailPage = () => {
         });
 
         setStatus("verified");
-        setMessage("Email verified successfully! 🎉");
-        toast.success("✅ Email verified! Please enter your password to login.");
+        setMessage("Email verified successfully.");
+        toast.success("Email verified successfully.");
+
+        // Standard flow: user must verify first. After verify, auto-login from this browser session if possible.
+        const pending = sessionStorage.getItem("pendingSignupCredentials");
+        if (pending) {
+          const { email, password } = JSON.parse(pending) as { email: string; password: string };
+          if (email === emailParam) {
+            const success = await login(email, password);
+            sessionStorage.removeItem("pendingSignupCredentials");
+            if (success) {
+              toast.success("Verification completed. Redirecting to home.");
+              setTimeout(() => navigate("/home"), 900);
+              return;
+            }
+          }
+        }
+
+        toast.success("Verification completed. Please log in.");
+        setTimeout(() => navigate("/login"), 900);
       } catch (error: any) {
         setStatus("error");
         const errorMessage = error.response?.data?.error || "Verification failed. Please try again.";
         setMessage(errorMessage);
-        toast.error("❌ " + errorMessage);
+        toast.error(errorMessage);
       }
     };
 
     verifyEmail();
-  }, [searchParams]);
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!password) {
-      toast.error("Please enter your password");
-      return;
-    }
-
-    setIsLoggingIn(true);
-    try {
-      const success = await login(email || "", password);
-      if (success) {
-        toast.success("✅ Logged in successfully!");
-        navigate("/home");
-      } else {
-        toast.error("Login failed. Please check your credentials.");
-      }
-    } catch (error) {
-      toast.error("An error occurred during login.");
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
+  }, [searchParams, navigate, login]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 p-6">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.3 }}
-        className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8"
-      >
-        {status === "loading" && (
-          <div className="text-center">
-            <Loader className="w-16 h-16 mx-auto text-green-600 animate-spin mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Verifying Email</h1>
-            <p className="text-gray-600">Please wait while we verify your email address...</p>
-          </div>
-        )}
-
-        {status === "verified" && (
-          <div>
-            <div className="text-center mb-6">
-              <CheckCircle className="w-16 h-16 mx-auto text-green-600 mb-4" />
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Email Verified!</h1>
-              <p className="text-gray-600">{message}</p>
-            </div>
-
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                <input
-                  type="email"
-                  value={email || ""}
-                  disabled
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
-                />
+    <PageTransition>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-plantcare-beige p-6">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-sm p-8">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+            {status === "loading" && (
+              <div className="text-center">
+                <Loader className="w-12 h-12 mx-auto text-plantcare-green animate-spin mb-4" />
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">Verifying Email</h1>
+                <p className="text-gray-500">Please wait while we verify your email address.</p>
               </div>
+            )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-2.5 text-gray-500 hover:text-gray-700"
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
+            {status === "verified" && (
+              <div className="text-center">
+                <CheckCircle className="w-12 h-12 mx-auto text-plantcare-green mb-4" />
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">Email Verified</h1>
+                <p className="text-gray-500">{message}</p>
               </div>
+            )}
 
-              <button
-                type="submit"
-                disabled={isLoggingIn}
-                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-3 px-4 rounded-lg transition duration-200"
-              >
-                {isLoggingIn ? "Logging in..." : "Continue to Home"}
-              </button>
-            </form>
-          </div>
-        )}
-
-        {status === "error" && (
-          <div className="text-center">
-            <AlertCircle className="w-16 h-16 mx-auto text-red-600 mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Verification Failed</h1>
-            <p className="text-gray-600 mb-6">{message}</p>
-            <button
-              onClick={() => navigate("/")}
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200"
-            >
-              Return to Home
-            </button>
-          </div>
-        )}
-      </motion.div>
-    </div>
+            {status === "error" && (
+              <div className="text-center">
+                <AlertCircle className="w-12 h-12 mx-auto text-red-600 mb-4" />
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">Verification Failed</h1>
+                <p className="text-gray-500 mb-6">{message}</p>
+                <button
+                  onClick={() => navigate("/login")}
+                  className="w-full bg-plantcare-green text-white py-3 rounded-lg font-medium transition-all duration-200 hover:bg-plantcare-green-dark"
+                >
+                  Go to Login
+                </button>
+              </div>
+            )}
+          </motion.div>
+        </div>
+      </div>
+    </PageTransition>
   );
 };
 
