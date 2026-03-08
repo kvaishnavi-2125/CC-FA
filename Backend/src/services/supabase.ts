@@ -8,10 +8,16 @@ class Supabase {
 
   constructor() {
     const supabaseUrl = process.env.SUPABASE_URL || "";
-    const supabaseKey = process.env.SUPABASE_ANON_KEY || "";
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+    const anonKey = process.env.SUPABASE_ANON_KEY || "";
+    const supabaseKey = serviceRoleKey || anonKey;
 
     if (!supabaseUrl || !supabaseKey) {
-      throw new Error("Missing SUPABASE_URL or SUPABASE_ANON_KEY environment variables");
+      throw new Error("Missing SUPABASE_URL and/or Supabase key environment variables");
+    }
+
+    if (!serviceRoleKey) {
+      console.warn("SUPABASE_SERVICE_ROLE_KEY not set. Backend is using anon key and may hit RLS policies.");
     }
 
     this.client = createClient(supabaseUrl, supabaseKey);

@@ -64,6 +64,10 @@ const AddPlantPage = () => {
 
       if (response?.imageUploaded) {
         toast.success("Image successfully uploaded");
+      } else if (formData.image && response?.imageUploadError) {
+        toast.error(`Image upload failed: ${response.imageUploadError}`);
+      } else if (formData.image) {
+        toast.error("Image upload failed");
       }
 
       if (response?.emailSent) {

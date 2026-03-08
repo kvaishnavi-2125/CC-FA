@@ -7,6 +7,7 @@ export const addPlant = async (plantData: any) => {
   try {
     let uploadedImageUrl = plantData.image_url;
     let imageUploaded = false;
+    let imageUploadError: string | null = null;
 
     if (plantData.image instanceof File) {
       const file = plantData.image as File;
@@ -26,6 +27,9 @@ export const addPlant = async (plantData: any) => {
         const { data } = supabase.storage.from("plant-images").getPublicUrl(storagePath);
         uploadedImageUrl = data.publicUrl;
         imageUploaded = true;
+      } else {
+        imageUploadError = uploadError.message || "Image upload failed";
+        console.error("Plant image upload failed:", uploadError);
       }
     }
 
@@ -42,6 +46,7 @@ export const addPlant = async (plantData: any) => {
     return {
       ...response.data,
       imageUploaded,
+      imageUploadError,
     };
   } catch (error) {
     console.error("Error adding plant:", error);
