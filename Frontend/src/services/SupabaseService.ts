@@ -15,19 +15,27 @@ class SupabaseService {
   }
 
   static async signup(email: string, password: string, metadata: { [key: string]: any }) {
+    // Get frontend URL for redirect (not actually used for verification, just to suppress Supabase email)
+    const frontendUrl = import.meta.env.VITE_FRONTEND_URL || window.location.origin;
+    
     const { data, error } = await supabase.auth.signUp(
       {
-        email, password, options: {
-          data: metadata
+        email,
+        password,
+        options: {
+          data: metadata,
+          emailRedirectTo: `${frontendUrl}/auth/verify`, // This helps suppress Supabase confirmation email
         }
       }
     );
     if (error) throw error;
 
-    // Send user data to the "/user" endpoint
+    // Send user data to the "/user" endpoint (this will trigger our custom verification email)
     try {
       await axios.post(`${APP_BACKEND_BASE_URL}/user`, {
         user_id: data.user?.id,
+        email: email,
+        username: metadata.username || metadata.name,
         profile_pic_url: null,
         notification_preferences: null,
         ...metadata,

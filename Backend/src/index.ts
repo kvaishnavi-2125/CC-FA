@@ -11,6 +11,11 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 8787;
 
+// In-memory token storage (token -> {email, timestamp})
+// In production, use a database table for persistence
+const verificationTokens: Map<string, { email: string; timestamp: number }> = new Map();
+const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 // Middleware
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -55,21 +60,120 @@ app.post("/user", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Missing user_id" });
     }
 
-    // Set default notification preferences if not provided
-    if (!userData.notification_preferences) {
-      userData.notification_preferences = {
-        watering: true,
-        fertilizing: true,
-        disease_alerts: true,
-      };
+    if (!userData.email) {
+      return res.status(400).json({ error: "Missing email" });
+    }
+
+    if (!userData.username) {
+      return res.status(400).json({ error: "Missing username" });
     }
 
     const userService = new UserService();
-    const newUser = await userService.createUser(userData);
-    return res.status(201).json(newUser);
+
+    // Check if user already exists
+    const existingUser = await userService.getUser(userData.user_id).catch(() => null);
+    const isNewUser = !existingUser;
+
+    if (isNewUser) {
+      // Set default notification preferences if not provided
+      if (!userData.notification_preferences) {
+        userData.notification_preferences = {
+          watering: true,
+          fertilizing: true,
+          disease_alerts: true,
+        };
+      }
+
+      // Clean up userData - only keep required fields for database
+      const cleanUserData: User = {
+        user_id: userData.user_id,
+        email: userData.email,
+        username: userData.username,
+        first_name: userData.first_name || userData.username?.split(' ')[0] || '',
+        last_name: userData.last_name || userData.username?.split(' ')[1] || '',
+        profile_pic_url: userData.profile_pic_url || null,
+        location: userData.location || undefined,
+        climate_zone: userData.climate_zone || undefined,
+        notification_preferences: userData.notification_preferences,
+      };
+
+      const newUser = await userService.createUser(cleanUserData);
+
+      // Send verification email ONLY for new users
+      try {
+        const emailService = new EmailService();
+        const verificationToken = emailService.generateVerificationToken();
+        
+        // Store token for verification (24 hour expiry)
+        verificationTokens.set(verificationToken, {
+          email: userData.email,
+          timestamp: Date.now(),
+        });
+        
+        // Build verification link
+        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+        const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}&email=${encodeURIComponent(userData.email)}`;
+        
+        await emailService.sendVerificationEmail(userData.email, userData.username, verificationLink);
+        
+        console.log("Verification email sent to new user");
+      } catch (emailError: any) {
+        console.error("Warning: Failed to send verification email:", emailError.message);
+        // Don't fail user creation if email fails
+      }
+
+      return res.status(201).json(newUser);
+    } else {
+      // Existing user - just return their data
+      return res.status(200).json(existingUser);
+    }
   } catch (error: any) {
-    console.error("Error creating user:", error);
+    console.error("Error creating/retrieving user:", error);
     return res.status(500).json({ error: error.message || "Failed to create user" });
+  }
+});
+
+// Verify email endpoint
+app.post("/verify-email", async (req: Request, res: Response) => {
+  try {
+    const { token, email } = req.body;
+
+    if (!token || !email) {
+      return res.status(400).json({ error: "Missing token or email" });
+    }
+
+    // Check if token exists and is valid
+    const tokenData = verificationTokens.get(token);
+    
+    if (!tokenData) {
+      return res.status(400).json({ error: "Invalid or expired verification token" });
+    }
+
+    // Check if token has expired
+    if (Date.now() - tokenData.timestamp > TOKEN_EXPIRY_MS) {
+      verificationTokens.delete(token);
+      return res.status(400).json({ error: "Verification token has expired" });
+    }
+
+    // Check if email matches
+    if (tokenData.email !== email) {
+      return res.status(400).json({ error: "Email does not match token" });
+    }
+
+    // Token is valid - mark user as verified
+    // You can update a verified_at field in your users table
+    const userService = new UserService();
+    
+    // Update user verification status (add this method to UserService)
+    await userService.verifyUserEmail(email);
+
+    // Delete token after use
+    verificationTokens.delete(token);
+
+    return res.json({ message: "Email verified successfully" });
+  } catch (error: any) {
+    console.error("Error verifying email:", error);
+    return res.status(500).json({ error: error.message || "Failed to verify email" });
   }
 });
 

@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 // Pages
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
 import HomePage from "./pages/HomePage";
 import MyPlantsPage from "./pages/MyPlantsPage";
 import FavoritesPage from "./pages/FavoritesPage";
@@ -72,6 +73,7 @@ const AppContent = () => (
             <RegisterPage />
           </GuestRoute>
         } />
+        <Route path="verify-email" element={<VerifyEmailPage />} />
         <Route path="home" element={
           <ProtectedRoute>
             <HomePage />

@@ -106,7 +106,9 @@ const RegisterPage = () => {
 
         const success = await signup(formData.email, formData.password, metadata);
         if (success) {
-          toast.success("Registration successful! Welcome to GreenGuardian. Please login.");
+          toast.success("✉️ Registration successful! Verification email sent. Check your inbox.", {
+            duration: 5000,
+          });
           navigate("/login");
         } else {
           toast.error("Registration failed on GreenGuardian. Please try again.");

@@ -8,8 +8,8 @@ export interface User {
   user_id?: string;
   email: string;
   username: string;
-  first_name: string;
-  last_name: string;
+  first_name?: string;
+  last_name?: string;
   profile_pic_url?: string | null;
   location?: string;
   climate_zone?: string;
@@ -60,6 +60,25 @@ class UserService {
       return data && data.length > 0 ? data[0] : userData;
     } catch (error: any) {
       console.error("Supabase insert error:", error);
+      throw error;
+    }
+  }
+
+  async verifyUserEmail(email: string) {
+    try {
+      const { data, error } = await this.supabase.client
+        .from("users")
+        .update({ email_verified: true, updated_at: new Date() })
+        .eq("email", email)
+        .select();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return data;
+    } catch (error: any) {
+      console.error("Error verifying user email:", error);
       throw error;
     }
   }
