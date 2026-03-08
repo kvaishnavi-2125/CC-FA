@@ -10,6 +10,8 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 8787;
+const HOST = process.env.HOST || "0.0.0.0";
+const PUBLIC_BACKEND_URL = process.env.PUBLIC_BACKEND_URL || "";
 
 // In-memory token storage (token -> {email, timestamp})
 // In production, use a database table for persistence
@@ -363,8 +365,9 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`✅ Backend server running on http://localhost:${PORT}`);
+app.listen(Number(PORT), HOST, () => {
+  const displayUrl = PUBLIC_BACKEND_URL || `http://${HOST}:${PORT}`;
+  console.log(`✅ Backend server running on ${displayUrl}`);
 });
 
 export default app;
