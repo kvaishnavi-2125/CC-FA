@@ -18,7 +18,7 @@ export default class EmailService {
   async sendEmail(to: string, subject: string, htmlContent: string): Promise<void> {
     try {
       const { data, error } = await this.resend.emails.send({
-        from: "GreenGuardian <greengaurdian@vaishnavikadam.me>",
+        from: "GreenGuardian🌿 <greengaurdian@vaishnavikadam.me>",
         to: [to],
         subject: subject,
         html: htmlContent,
@@ -38,7 +38,7 @@ export default class EmailService {
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f9f9f9; padding: 20px; border-radius: 8px;">
         <div style="text-align: center; margin-bottom: 30px;">
-          <h2 style="color: #2d5016; margin: 0;">Welcome to GreenGuardian</h2>
+          <h2 style="color: #2d5016; margin: 0;">Welcome to GreenGuardian🌿</h2>
         </div>
         
         <p>Hi <strong>${username}</strong>,</p>
@@ -76,7 +76,7 @@ export default class EmailService {
   async sendSignupConfirmationEmail(to: string, username: string): Promise<void> {
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #2d5016;">Welcome to GreenGuardian</h2>
+        <h2 style="color: #2d5016;">Welcome to GreenGuardian🌿</h2>
         <p>Hi <strong>${username}</strong>,</p>
         <p>Thank you for signing up! We're excited to have you join our plant care community.</p>
         <p>Your account has been successfully created. You can now:</p>
