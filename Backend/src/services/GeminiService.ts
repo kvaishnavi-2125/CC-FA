@@ -1,19 +1,38 @@
-import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import Groq from "groq-sdk";
 
 dotenv.config();
 
 export default class GeminiService {
-  private ai: GoogleGenAI;
+  private groq: Groq;
+  private chatModel: string;
 
   constructor() {
-    const apiKey = process.env.GOOGLE_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
-      throw new Error("GOOGLE_API_KEY environment variable is required");
+      throw new Error("GROQ_API_KEY environment variable is required");
     }
-    this.ai = new GoogleGenAI({
-      apiKey: apiKey
+    this.groq = new Groq({ apiKey });
+    this.chatModel = process.env.GROQ_MODEL || "llama-3.1-8b-instant";
+  }
+
+  private async generateText(systemPrompt: string, userPrompt: string): Promise<string> {
+    const completion = await this.groq.chat.completions.create({
+      model: this.chatModel,
+      temperature: 0.4,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
     });
+
+    const text = completion.choices?.[0]?.message?.content;
+
+    if (!text || typeof text !== "string") {
+      throw new Error("Empty response from Groq model");
+    }
+
+    return text.trim();
   }
 
   async getCareRecommendations(plantData: any, imageFile?: File | Blob) {
@@ -28,55 +47,39 @@ export default class GeminiService {
     `;
 
     try {
-      let uploadedFileUri = null;
-
-      // Upload the image file if provided
-      if (imageFile) {
-        const uploadedFile = await this.ai.files.upload({
-          file: imageFile,
-          config: { mimeType: "image/jpeg" },
-        });
-        console.log("Uploaded file:", uploadedFile);
-        uploadedFileUri = uploadedFile.uri;
-      }
-
-      // Generate content using the uploaded file's URI (or without if no image)
-      const response = await this.ai.models.generateContent({
-        model: "gemini-2.0-flash",
-        contents: JSON.stringify({
-          prompt: systemPrompt,
-          plantDetails: plantData,
-          ...(uploadedFileUri && { imageUri: uploadedFileUri }),
-        }),
+      const userPrompt = JSON.stringify({
+        plantDetails: plantData,
+        imageProvided: Boolean(imageFile),
       });
-      console.log("AI response:", response.text);
-      
-      if (!response.text) throw new Error("Empty response from GoogleGenAI");
-      return JSON.parse(response.text.replace(/```/g, "").replace(/json/g, ""));
+
+      const text = await this.generateText(systemPrompt, userPrompt);
+      const normalized = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+      return JSON.parse(normalized);
     } catch (error) {
-      console.error("Error fetching care recommendations from GoogleGenAI:", error);
-      throw new Error("Failed to fetch care recommendations from GoogleGenAI");
+      console.error("Error fetching care recommendations from Groq:", error);
+      throw new Error("Failed to fetch care recommendations from Groq");
     }
   }
 
   async getChatResponse(systemPrompt: string, userMessage: string) {
     try {
-      const response = await this.ai.models.generateContent({
-        model: "gemini-2.0-flash",
-        contents: JSON.stringify({
-          prompt: systemPrompt,
-          userMessage,
-        }),
-      });
+      return await this.generateText(systemPrompt, userMessage);
+    } catch (error: any) {
+      console.error("Error fetching chat response from Groq model:", error);
 
-      if (!response.text) {
-        throw new Error("Empty response from Gemini model");
+      // Graceful fallback for quota / rate limit issues so chat remains functional.
+      const rawError = String(error?.message || "").toLowerCase();
+      const isQuotaOrRateLimit =
+        rawError.includes("429") ||
+        rawError.includes("resource_exhausted") ||
+        rawError.includes("quota") ||
+        rawError.includes("rate limit");
+
+      if (isQuotaOrRateLimit) {
+        return "I am currently experiencing high traffic. I can still help with plant care basics. Share your plant name, sunlight, watering routine, and any symptoms (yellow leaves, spots, drooping), and I will suggest next steps.";
       }
 
-      return response.text.trim();
-    } catch (error) {
-      console.error("Error fetching chat response from Gemini model:", error);
-      throw new Error("Failed to fetch chat response from Gemini model");
+      throw new Error("Failed to fetch chat response from Groq model");
     }
   }
 }

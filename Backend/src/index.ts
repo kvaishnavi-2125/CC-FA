@@ -287,11 +287,19 @@ app.post("/plants", async (req: Request, res: Response) => {
 
 app.post("/chat", async (req: Request, res: Response) => {
   try {
-    const { message } = req.body;
+    const { message, history } = req.body;
 
-    if (!message) {
+    if (!message || typeof message !== "string") {
       return res.status(400).json({ error: "Missing message in request body" });
     }
+
+    const sanitizedHistory = Array.isArray(history)
+      ? history
+          .filter((item) => item && typeof item.text === "string" && typeof item.isUser === "boolean")
+          .slice(-10)
+          .map((item) => `${item.isUser ? "User" : "Assistant"}: ${item.text}`)
+          .join("\n")
+      : "";
 
     const geminiService = new GeminiService();
     const systemPrompt = `
@@ -300,12 +308,25 @@ app.post("/chat", async (req: Request, res: Response) => {
       If the question is unrelated to plants, politely redirect the user to ask plant-related questions.
     `;
 
-    const response = await geminiService.getChatResponse(systemPrompt, message);
+    const messageWithContext = sanitizedHistory
+      ? `Conversation history:\n${sanitizedHistory}\n\nLatest user question: ${message}`
+      : message;
+
+    const response = await geminiService.getChatResponse(systemPrompt, messageWithContext);
     console.log("Chat response:", response);
 
     return res.json({ response });
   } catch (error: any) {
     console.error("Error processing chat message:", error);
+    const errorText = String(error?.message || "").toLowerCase();
+    if (
+      errorText.includes("quota") ||
+      errorText.includes("resource_exhausted") ||
+      errorText.includes("rate limit")
+    ) {
+      return res.status(429).json({ error: "Chat service is temporarily busy. Please try again in a few moments." });
+    }
+
     return res.status(500).json({ error: error.message || "Failed to process chat message" });
   }
 });

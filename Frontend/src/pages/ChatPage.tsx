@@ -51,7 +51,12 @@ const ChatPage = () => {
     setIsSending(true);
 
     try {
-      const botResponse = await sendMessageToChatBot(JSON.stringify(updatedMessages));
+      const historyPayload = updatedMessages.map((msg) => ({
+        text: msg.text,
+        isUser: msg.isUser,
+      }));
+
+      const botResponse = await sendMessageToChatBot(newMessage, historyPayload);
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
         text: botResponse,

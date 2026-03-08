@@ -18,7 +18,7 @@ export default class EmailService {
   async sendEmail(to: string, subject: string, htmlContent: string): Promise<void> {
     try {
       const { data, error } = await this.resend.emails.send({
-        from: "GreenGuardian🌿 <greengaurdian@vaishnavikadam.me>",
+        from: "GreenGuardian<greengaurdian@vaishnavikadam.me>",
         to: [to],
         subject: subject,
         html: htmlContent,
