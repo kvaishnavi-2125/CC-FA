@@ -7,6 +7,23 @@ const APP_BACKEND_BASE_URL = import.meta.env.VITE_APP_BACKEND_BASE_URL;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+const buildFrontendRedirectUrl = (): string => {
+  const runtimeOrigin = window.location.origin;
+  const configured = (import.meta.env.VITE_FRONTEND_URL || "").trim();
+
+  // Guard against accidentally shipping localhost as redirect URL to production.
+  if (configured && !(configured.includes("localhost") && !runtimeOrigin.includes("localhost"))) {
+    return `${configured.replace(/\/$/, "")}/verify-email`;
+  }
+
+  return `${runtimeOrigin}/verify-email`;
+};
+
+const isInvalidRefreshTokenError = (error: any) => {
+  const message = String(error?.message || "").toLowerCase();
+  return message.includes("invalid refresh token") || message.includes("refresh token not found");
+};
+
 class SupabaseService {
   private static async isRegisteredUser(uid: string): Promise<boolean> {
     const response = await axios.get(`${APP_BACKEND_BASE_URL}/user`, {
@@ -34,20 +51,33 @@ class SupabaseService {
   }
 
   static async signup(email: string, password: string, metadata: { [key: string]: any }) {
-    // Get frontend URL for redirect
-    const frontendUrl = import.meta.env.VITE_FRONTEND_URL || window.location.origin;
-    
-    const { data, error } = await supabase.auth.signUp(
+    const redirectUrl = buildFrontendRedirectUrl();
+
+    let signupResult = await supabase.auth.signUp(
       {
         email,
         password,
         options: {
           data: metadata,
-          emailRedirectTo: `${frontendUrl}/verify-email`,
+          emailRedirectTo: redirectUrl,
         }
       }
     );
-    if (error) throw error;
+
+    // If redirect URL isn't whitelisted in Supabase, retry without redirect_to.
+    if (signupResult.error && signupResult.error.status === 422) {
+      signupResult = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: metadata,
+        },
+      });
+    }
+
+    if (signupResult.error) throw signupResult.error;
+
+    const { data } = signupResult;
 
     // Send user data to the "/user" endpoint (this will trigger our custom verification email)
     try {
@@ -73,6 +103,10 @@ class SupabaseService {
   static async getSession(): Promise<Session | null> {
     const { data, error } = await supabase.auth.getSession();
     if (error) {
+      if (isInvalidRefreshTokenError(error)) {
+        // Local sign-out clears stale tokens without requiring server connectivity.
+        await supabase.auth.signOut({ scope: "local" });
+      }
       console.error("Error fetching session:", error);
       return null;
     }
