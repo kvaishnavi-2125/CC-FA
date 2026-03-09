@@ -14,6 +14,19 @@ const VerifyEmailPage = () => {
   const [status, setStatus] = useState<"loading" | "verified" | "error">("loading");
   const [message, setMessage] = useState("");
 
+  const resolveBackendBaseUrl = () => {
+    const configured = (import.meta.env.VITE_APP_BACKEND_BASE_URL || "").trim();
+    const local = (import.meta.env.VITE_LOCAL_BACKEND_BASE_URL || "http://localhost:8787").trim();
+    const runtimeHost = window.location.hostname;
+    const isLocalRuntime = runtimeHost === "localhost" || runtimeHost === "127.0.0.1";
+
+    if (isLocalRuntime && (!configured || configured.includes("3.110.33.69"))) {
+      return local;
+    }
+
+    return configured || local;
+  };
+
   useEffect(() => {
     const verifyEmail = async () => {
       const token = searchParams.get("token");
@@ -26,7 +39,7 @@ const VerifyEmailPage = () => {
       }
 
       try {
-        const backendUrl = import.meta.env.VITE_APP_BACKEND_BASE_URL;
+        const backendUrl = resolveBackendBaseUrl();
         
         await axios.post(`${backendUrl}/verify-email`, {
           token,

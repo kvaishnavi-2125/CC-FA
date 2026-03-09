@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import crypto from "crypto";
 import UserService, { User } from "./services/users.js";
 import PlantService, { Plant } from "./services/plants.js";
 import GeminiService from "./services/GeminiService.js";
@@ -12,6 +13,7 @@ const app = express();
 const PORT = process.env.PORT || 8787;
 const HOST = process.env.HOST || "0.0.0.0";
 const PUBLIC_BACKEND_URL = process.env.PUBLIC_BACKEND_URL || "";
+const VERIFICATION_TOKEN_SECRET = process.env.VERIFICATION_TOKEN_SECRET || "dev-verification-secret-change-me";
 
 const defaultAllowedOrigins = [
   "http://localhost:5173",
@@ -27,10 +29,59 @@ const envAllowedOrigins = (process.env.CORS_ORIGINS || "")
 
 const allowedOrigins = [...new Set([...defaultAllowedOrigins, ...envAllowedOrigins])];
 
-// In-memory token storage (token -> {email, timestamp})
-// In production, use a database table for persistence
-const verificationTokens: Map<string, { email: string; timestamp: number }> = new Map();
 const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+const toBase64Url = (value: string) => Buffer.from(value, "utf8").toString("base64url");
+
+const createVerificationToken = (email: string): string => {
+  const payload = JSON.stringify({
+    email,
+    iat: Date.now(),
+  });
+  const encodedPayload = toBase64Url(payload);
+  const signature = crypto
+    .createHmac("sha256", VERIFICATION_TOKEN_SECRET)
+    .update(encodedPayload)
+    .digest("base64url");
+
+  return `${encodedPayload}.${signature}`;
+};
+
+const verifyVerificationToken = (token: string, email: string): { ok: boolean; error?: string } => {
+  const [encodedPayload, providedSignature] = token.split(".");
+  if (!encodedPayload || !providedSignature) {
+    return { ok: false, error: "Invalid verification token" };
+  }
+
+  const expectedSignature = crypto
+    .createHmac("sha256", VERIFICATION_TOKEN_SECRET)
+    .update(encodedPayload)
+    .digest("base64url");
+
+  if (providedSignature !== expectedSignature) {
+    return { ok: false, error: "Invalid verification token signature" };
+  }
+
+  try {
+    const payloadText = Buffer.from(encodedPayload, "base64url").toString("utf8");
+    const payload = JSON.parse(payloadText) as { email?: string; iat?: number };
+    if (!payload.email || !payload.iat) {
+      return { ok: false, error: "Malformed verification token" };
+    }
+
+    if (payload.email !== email) {
+      return { ok: false, error: "Email does not match token" };
+    }
+
+    if (Date.now() - payload.iat > TOKEN_EXPIRY_MS) {
+      return { ok: false, error: "Verification token has expired" };
+    }
+
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Invalid verification token payload" };
+  }
+};
 
 // Middleware
 app.use(express.json({ limit: "50mb" }));
@@ -129,13 +180,7 @@ app.post("/user", async (req: Request, res: Response) => {
       // Send verification email ONLY for new users
       try {
         const emailService = new EmailService();
-        const verificationToken = emailService.generateVerificationToken();
-        
-        // Store token for verification (24 hour expiry)
-        verificationTokens.set(verificationToken, {
-          email: userData.email,
-          timestamp: Date.now(),
-        });
+        const verificationToken = createVerificationToken(userData.email);
         
         // Build verification link
         const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
@@ -169,22 +214,9 @@ app.post("/verify-email", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Missing token or email" });
     }
 
-    // Check if token exists and is valid
-    const tokenData = verificationTokens.get(token);
-    
-    if (!tokenData) {
-      return res.status(400).json({ error: "Invalid or expired verification token" });
-    }
-
-    // Check if token has expired
-    if (Date.now() - tokenData.timestamp > TOKEN_EXPIRY_MS) {
-      verificationTokens.delete(token);
-      return res.status(400).json({ error: "Verification token has expired" });
-    }
-
-    // Check if email matches
-    if (tokenData.email !== email) {
-      return res.status(400).json({ error: "Email does not match token" });
+    const verification = verifyVerificationToken(token, email);
+    if (!verification.ok) {
+      return res.status(400).json({ error: verification.error || "Invalid or expired verification token" });
     }
 
     // Token is valid - mark user as verified
@@ -193,9 +225,6 @@ app.post("/verify-email", async (req: Request, res: Response) => {
     
     // Update user verification status (add this method to UserService)
     await userService.verifyUserEmail(email);
-
-    // Delete token after use
-    verificationTokens.delete(token);
 
     return res.json({ message: "Email verified successfully" });
   } catch (error: any) {
