@@ -43,6 +43,9 @@
 Create a `.env` file in the `/home/ubuntu/CEP_Project/cep-backend` directory with:
 ```
 PORT=8787
+HOST=0.0.0.0
+PUBLIC_BACKEND_URL=http://<EC2_PUBLIC_IP>:8787
+CORS_ORIGINS=http://<your-s3-website-endpoint>,https://<your-cloudfront-domain>,http://localhost:5173
 SUPABASE_URL=your_supabase_url
 SUPABASE_ANON_KEY=your_supabase_key
 FRONTEND_URL=your_frontend_url
@@ -79,6 +82,23 @@ pm2 logs cep-backend
 **If modules not found:**
 - Run: `npm install`
 - Verify all .env variables are set
+
+**If frontend shows `ERR_CONNECTION_RESET` to `<EC2_IP>:8787`:**
+- Verify app is listening on all interfaces: `HOST=0.0.0.0`
+- Verify process is running: `pm2 status` and `pm2 logs cep-backend --lines 100`
+- Verify backend locally on EC2: `curl http://localhost:8787/`
+- Verify backend via public IP from EC2: `curl http://<EC2_PUBLIC_IP>:8787/`
+- Open EC2 Security Group inbound rule for custom TCP `8787` from your required source (temporary test: `0.0.0.0/0`)
+- If UFW is enabled: `sudo ufw allow 8787/tcp`
+
+**If S3 frontend shows `404 Not Found` on page refresh:**
+- In S3 static website hosting, set both `Index document` and `Error document` to `index.html` for SPA routing
+- Re-upload the latest `dist` contents to S3
+
+**If frontend still calls the wrong backend URL:**
+- Confirm `Frontend/.env` has `VITE_APP_BACKEND_BASE_URL=http://<EC2_PUBLIC_IP>:8787`
+- Rebuild frontend after env changes: `npm run build`
+- Upload fresh `dist` files to S3 (old bundles keep old env values)
 
 **To stop the server:**
 ```bash

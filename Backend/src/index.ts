@@ -13,6 +13,20 @@ const PORT = process.env.PORT || 8787;
 const HOST = process.env.HOST || "0.0.0.0";
 const PUBLIC_BACKEND_URL = process.env.PUBLIC_BACKEND_URL || "";
 
+const defaultAllowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:8080",
+  "http://plant-care-app.s3-website.ap-south-1.amazonaws.com",
+  "https://plant-care-app.s3.ap-south-1.amazonaws.com",
+];
+
+const envAllowedOrigins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const allowedOrigins = [...new Set([...defaultAllowedOrigins, ...envAllowedOrigins])];
+
 // In-memory token storage (token -> {email, timestamp})
 // In production, use a database table for persistence
 const verificationTokens: Map<string, { email: string; timestamp: number }> = new Map();
@@ -21,15 +35,23 @@ const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 // Middleware
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
-app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "http://plant-care-app.s3-website.ap-south-1.amazonaws.com",
-  ],
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  allowedHeaders: ["Content-Type"],
+
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Allow non-browser calls (curl, health checks) and configured browser origins.
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error(`Origin ${origin} not allowed by CORS`));
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
-}));
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 // Health check
 app.get("/", (req: Request, res: Response) => {
