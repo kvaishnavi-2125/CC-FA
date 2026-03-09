@@ -4,6 +4,7 @@ import axios from "axios";
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const APP_BACKEND_BASE_URL = import.meta.env.VITE_APP_BACKEND_BASE_URL;
+const LOCAL_BACKEND_BASE_URL = import.meta.env.VITE_LOCAL_BACKEND_BASE_URL || "http://localhost:8787";
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -24,9 +25,36 @@ const isInvalidRefreshTokenError = (error: any) => {
   return message.includes("invalid refresh token") || message.includes("refresh token not found");
 };
 
+const resolveBackendBaseUrl = (): string => {
+  const runtimeHost = window.location.hostname;
+  const isLocalRuntime = runtimeHost === "localhost" || runtimeHost === "127.0.0.1";
+  const configured = (APP_BACKEND_BASE_URL || "").trim();
+
+  // Prefer local backend while developing locally unless explicitly overridden.
+  if (isLocalRuntime) {
+    const pointsToEc2 = configured.includes("3.110.33.69");
+    if (!configured || pointsToEc2) {
+      return LOCAL_BACKEND_BASE_URL;
+    }
+  }
+
+  return configured || LOCAL_BACKEND_BASE_URL;
+};
+
+const BACKEND_BASE_URL = resolveBackendBaseUrl();
+
+const api = axios.create({
+  baseURL: BACKEND_BASE_URL,
+  timeout: 10000,
+});
+
+const isBackendNetworkError = (error: unknown) => {
+  return axios.isAxiosError(error) && !error.response;
+};
+
 class SupabaseService {
   private static async isRegisteredUser(uid: string): Promise<boolean> {
-    const response = await axios.get(`${APP_BACKEND_BASE_URL}/user`, {
+    const response = await api.get(`/user`, {
       params: { uid },
     });
 
@@ -41,10 +69,18 @@ class SupabaseService {
       throw new Error("Login failed. Please try again.");
     }
 
-    const isRegistered = await this.isRegisteredUser(data.user.id);
-    if (!isRegistered) {
-      await supabase.auth.signOut();
-      throw new Error("User not registered. Please register first.");
+    try {
+      const isRegistered = await this.isRegisteredUser(data.user.id);
+      if (!isRegistered) {
+        await supabase.auth.signOut({ scope: "local" });
+        throw new Error("User not registered. Please register first.");
+      }
+    } catch (error) {
+      if (isBackendNetworkError(error)) {
+        console.warn(`Backend ${BACKEND_BASE_URL} is unreachable during login validation. Allowing login.`);
+      } else {
+        throw error;
+      }
     }
 
     return data;
@@ -81,7 +117,7 @@ class SupabaseService {
 
     // Send user data to the "/user" endpoint (this will trigger our custom verification email)
     try {
-      await axios.post(`${APP_BACKEND_BASE_URL}/user`, {
+      await api.post(`/user`, {
         user_id: data.user?.id,
         email: email,
         username: metadata.username || metadata.name,
@@ -91,11 +127,13 @@ class SupabaseService {
       });
     } catch (postError) {
       console.error("Error creating user in database:", postError);
-      throw postError;
+      if (!isBackendNetworkError(postError)) {
+        throw postError;
+      }
     }
 
     // Sign out immediately - user must verify email first
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
 
     return data;
   }
@@ -117,27 +155,32 @@ class SupabaseService {
 
     const uid = data.session.user?.id;
     if (!uid) {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: "local" });
       return null;
     }
 
     try {
       const isRegistered = await this.isRegisteredUser(uid);
       if (!isRegistered) {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: "local" });
         return null;
       }
     } catch (sessionValidationError) {
       console.error("Session validation error:", sessionValidationError);
-      await supabase.auth.signOut();
-      return null;
+      if (!isBackendNetworkError(sessionValidationError)) {
+        await supabase.auth.signOut({ scope: "local" });
+        return null;
+      }
+
+      // Keep session if backend is temporarily unreachable.
+      return data.session;
     }
 
     return data.session;
   }
 
   static async logout() {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({ scope: "local" });
     if (error) {
       console.error("Logout error:", error);
       throw error;
