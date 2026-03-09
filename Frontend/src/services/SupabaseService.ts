@@ -59,6 +59,23 @@ class SupabaseService {
       console.info(`Backend reachable: ${BACKEND_BASE_URL}`);
       return true;
     } catch (error) {
+      // Backward compatibility for deployments that expose only `/`.
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        try {
+          await api.get("/");
+          console.info(`Backend reachable (legacy health route): ${BACKEND_BASE_URL}`);
+          return true;
+        } catch (fallbackError) {
+          if (isBackendNetworkError(fallbackError)) {
+            console.warn(`Backend unreachable: ${BACKEND_BASE_URL}. App will run in degraded mode until backend is reachable.`);
+            return false;
+          }
+
+          console.warn("Backend fallback health check returned unexpected response.", fallbackError);
+          return false;
+        }
+      }
+
       if (isBackendNetworkError(error)) {
         console.warn(`Backend unreachable: ${BACKEND_BASE_URL}. App will run in degraded mode until backend is reachable.`);
         return false;
