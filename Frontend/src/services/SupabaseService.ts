@@ -126,10 +126,13 @@ class SupabaseService {
         ...metadata,
       });
     } catch (postError) {
-      console.error("Error creating user in database:", postError);
       if (!isBackendNetworkError(postError)) {
+        console.error("Error creating user in database:", postError);
         throw postError;
       }
+
+      // Backend sync is best-effort during unstable connectivity.
+      console.warn("Backend user sync timed out/unreachable during signup. Continuing.", postError);
     }
 
     // Sign out immediately - user must verify email first
