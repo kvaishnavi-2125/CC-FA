@@ -67,17 +67,33 @@ class UserService {
 
   async verifyUserEmail(email: string) {
     try {
-      const { data, error } = await this.supabase.client
-        .from("users")
-        .update({ email_verified: true, updated_at: new Date() })
-        .eq("email", email)
-        .select();
+      const candidateUpdates: Array<Record<string, any>> = [
+        { email_verified: true, updated_at: new Date().toISOString() },
+        { email_verified: true },
+        { verified: true, updated_at: new Date().toISOString() },
+        { verified: true },
+        { verified_at: new Date().toISOString() },
+      ];
 
-      if (error) {
-        throw new Error(error.message);
+      for (const updatePayload of candidateUpdates) {
+        const { data, error } = await this.supabase.client
+          .from("users")
+          .update(updatePayload)
+          .eq("email", email)
+          .select();
+
+        if (!error) {
+          return data;
+        }
+
+        const message = String(error.message || "");
+        const isMissingColumn = message.includes("Could not find the") || message.includes("column");
+        if (!isMissingColumn) {
+          throw new Error(error.message);
+        }
       }
 
-      return data;
+      throw new Error("Unable to update verification status: no supported verification column found");
     } catch (error: any) {
       console.error("Error verifying user email:", error);
       throw error;
