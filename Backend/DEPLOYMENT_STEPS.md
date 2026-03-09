@@ -48,6 +48,7 @@ PUBLIC_BACKEND_URL=http://<EC2_PUBLIC_IP>:8787
 CORS_ORIGINS=http://<your-s3-website-endpoint>,https://<your-cloudfront-domain>,http://localhost:5173
 SUPABASE_URL=your_supabase_url
 SUPABASE_ANON_KEY=your_supabase_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 FRONTEND_URL=your_frontend_url
 AWS_ACCESS_KEY_ID=your_aws_key
 AWS_SECRET_ACCESS_KEY=your_aws_secret
@@ -82,6 +83,11 @@ pm2 logs cep-backend
 **If modules not found:**
 - Run: `npm install`
 - Verify all .env variables are set
+
+**If data inserts but select/read fails from backend:**
+- Ensure `SUPABASE_SERVICE_ROLE_KEY` is set on EC2 (required for backend service reads when RLS blocks anon key)
+- Rebuild and restart backend so updated env is applied: `npm run build && pm2 restart cep-backend`
+- Check logs for warning `SUPABASE_SERVICE_ROLE_KEY not set`
 
 **If frontend shows `ERR_CONNECTION_RESET` to `<EC2_IP>:8787`:**
 - Verify app is listening on all interfaces: `HOST=0.0.0.0`
