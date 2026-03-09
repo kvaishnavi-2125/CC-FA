@@ -5,6 +5,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const APP_BACKEND_BASE_URL = import.meta.env.VITE_APP_BACKEND_BASE_URL;
 const LOCAL_BACKEND_BASE_URL = import.meta.env.VITE_LOCAL_BACKEND_BASE_URL || "http://localhost:8787";
+const USE_REMOTE_BACKEND_IN_LOCAL = String(import.meta.env.VITE_USE_REMOTE_BACKEND_IN_LOCAL || "").toLowerCase() === "true";
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -29,11 +30,11 @@ const resolveBackendBaseUrl = (): string => {
   const runtimeHost = window.location.hostname;
   const isLocalRuntime = runtimeHost === "localhost" || runtimeHost === "127.0.0.1";
   const configured = (APP_BACKEND_BASE_URL || "").trim();
+  const pointsToLocal = configured.includes("localhost") || configured.includes("127.0.0.1");
 
-  // Prefer local backend while developing locally unless explicitly overridden.
+  // Prefer local backend while developing locally unless explicitly configured to use remote.
   if (isLocalRuntime) {
-    const pointsToEc2 = configured.includes("3.110.33.69");
-    if (!configured || pointsToEc2) {
+    if (!configured || (!pointsToLocal && !USE_REMOTE_BACKEND_IN_LOCAL)) {
       return LOCAL_BACKEND_BASE_URL;
     }
   }

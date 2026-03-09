@@ -17,10 +17,12 @@ const VerifyEmailPage = () => {
   const resolveBackendBaseUrl = () => {
     const configured = (import.meta.env.VITE_APP_BACKEND_BASE_URL || "").trim();
     const local = (import.meta.env.VITE_LOCAL_BACKEND_BASE_URL || "http://localhost:8787").trim();
+    const useRemoteInLocal = String(import.meta.env.VITE_USE_REMOTE_BACKEND_IN_LOCAL || "").toLowerCase() === "true";
     const runtimeHost = window.location.hostname;
     const isLocalRuntime = runtimeHost === "localhost" || runtimeHost === "127.0.0.1";
+    const pointsToLocal = configured.includes("localhost") || configured.includes("127.0.0.1");
 
-    if (isLocalRuntime && (!configured || configured.includes("3.110.33.69"))) {
+    if (isLocalRuntime && (!configured || (!pointsToLocal && !useRemoteInLocal))) {
       return local;
     }
 
