@@ -53,6 +53,22 @@ const isBackendNetworkError = (error: unknown) => {
 };
 
 class SupabaseService {
+  static async checkBackendHealth(): Promise<boolean> {
+    try {
+      await api.get("/healthz");
+      console.info(`Backend reachable: ${BACKEND_BASE_URL}`);
+      return true;
+    } catch (error) {
+      if (isBackendNetworkError(error)) {
+        console.warn(`Backend unreachable: ${BACKEND_BASE_URL}. App will run in degraded mode until backend is reachable.`);
+        return false;
+      }
+
+      console.warn("Backend health check returned unexpected response.", error);
+      return false;
+    }
+  }
+
   private static async isRegisteredUser(uid: string): Promise<boolean> {
     const response = await api.get(`/user`, {
       params: { uid },
@@ -169,13 +185,13 @@ class SupabaseService {
         return null;
       }
     } catch (sessionValidationError) {
-      console.error("Session validation error:", sessionValidationError);
       if (!isBackendNetworkError(sessionValidationError)) {
+        console.error("Session validation error:", sessionValidationError);
         await supabase.auth.signOut({ scope: "local" });
         return null;
       }
 
-      // Keep session if backend is temporarily unreachable.
+      console.warn(`Backend ${BACKEND_BASE_URL} is unreachable during session validation. Continuing with local session.`);
       return data.session;
     }
 

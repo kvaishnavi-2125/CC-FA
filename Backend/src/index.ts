@@ -109,6 +109,11 @@ app.get("/", (req: Request, res: Response) => {
   res.json({ message: "GreenGuardian Backend is running!" });
 });
 
+// Lightweight health endpoint for frontend startup connectivity probe.
+app.get("/healthz", (req: Request, res: Response) => {
+  res.json({ ok: true, service: "backend", timestamp: new Date().toISOString() });
+});
+
 // ===== USER ENDPOINTS =====
 
 // Get user by ID

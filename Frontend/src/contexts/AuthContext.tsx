@@ -18,6 +18,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     ; (async () => {
+      await SupabaseService.checkBackendHealth();
       const session = await SupabaseService.getSession();
       if (session) {
         setUser(session.user);
